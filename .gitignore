@@ -162,3 +162,5 @@ cython_debug/
 ..iniciarRepositorio.bat 
 ..GitPushMain.bat 
 node_modules/ 
+token.json
+credentials.json
