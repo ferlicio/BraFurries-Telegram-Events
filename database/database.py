@@ -304,7 +304,7 @@ def includeEvent(mydb, user: Union[discord.Member,str], locale_id:int, city:str,
         }
         service = build('calendar', 'v3', credentials=creds)
         response = service.events().insert(calendarId=os.getenv('GOOGLE_CALENDAR_EVENTS_ID'), body=eventToGCalendar).execute()
-        query = f"""INSERT IGNORE INTO events (host_user_id, locale_id, city, event_name, address, price, max_price, starting_datetime, ending_datetime, description, group_chat_link, website, event_logo_url, gc_event_id)
+        query = f"""INSERT IGNORE INTO events (host_user_id, locale_id, city, event_name, address, price, max_price, starting_datetime, ending_datetime, description, group_chat_link, website, event_logo_url, gcal_event_id)
     VALUES ({user_id}, {locale_id}, '{city}', '{event_name}', '{address}', '{price}', '{max_price if max_price!=None else 0}', '{starting_datetime}', '{ending_datetime}', '{description}', '{group_link}', '{website}', '{event_logo_url}', '{response['id']}');"""
         query = query.replace("'None'", 'NULL')
         cursor.execute(query)
@@ -487,7 +487,7 @@ def approveEventById(mydb, event_id:int):
 def scheduleNextEventDate(mydb, event_name:str, new_starting_datetime:datetime, user):
     cursor = mydb.cursor()
     #verifica se o evento já está agendado
-    query = f"""SELECT events.id, events.event_name, events.starting_datetime, events.ending_datetime, users.username, events.price, events.max_price, events.group_chat_link, events.website, events.address, events.gc_event_id
+    query = f"""SELECT events.id, events.event_name, events.starting_datetime, events.ending_datetime, users.username, events.price, events.max_price, events.group_chat_link, events.website, events.address, events.gcal_event_id
 FROM events
 JOIN users ON events.host_user_id = users.id
 WHERE event_name = '{event_name}';"""
@@ -496,7 +496,7 @@ WHERE event_name = '{event_name}';"""
     if myresult == []:
         return "não encontrado"
     else:
-        myresult = [{'id': i[0], 'event_name': i[1], 'starting_datetime': datetime.strptime(f'{i[2]}', '%Y-%m-%d %H:%M:%S'), 'ending_datetime': datetime.strptime(f'{i[3]}', '%Y-%m-%d %H:%M:%S'), 'host_user': i[4], 'price': i[5], 'max_price': i[6], 'group_chat_link': i[7], 'website': i[8], 'address': i[9], 'gc_event_id':i[10]
+        myresult = [{'id': i[0], 'event_name': i[1], 'starting_datetime': datetime.strptime(f'{i[2]}', '%Y-%m-%d %H:%M:%S'), 'ending_datetime': datetime.strptime(f'{i[3]}', '%Y-%m-%d %H:%M:%S'), 'host_user': i[4], 'price': i[5], 'max_price': i[6], 'group_chat_link': i[7], 'website': i[8], 'address': i[9], 'gcal_event_id':i[10]
                         } for i in myresult]
         """ if myresult[0]['ending_datetime'] > datetime.now():
             return "não encerrado" """
@@ -506,7 +506,7 @@ WHERE event_name = '{event_name}';"""
 def rescheduleEventDate(mydb, event_name:str, new_starting_datetime:datetime, user):
     cursor = mydb.cursor()
     #verifica se o evento já está agendado
-    query = f"""SELECT events.id, events.event_name, events.starting_datetime, events.ending_datetime, users.username, events.gc_event_id, events.price, events.max_price, events.group_chat_link, events.website, events.address
+    query = f"""SELECT events.id, events.event_name, events.starting_datetime, events.ending_datetime, users.username, events.gcal_event_id, events.price, events.max_price, events.group_chat_link, events.website, events.address
 FROM events
 JOIN users ON events.host_user_id = users.id
 WHERE event_name = '{event_name}';"""
@@ -515,7 +515,7 @@ WHERE event_name = '{event_name}';"""
     if myresult == []:
         return "não encontrado"
     else:
-        myresult = [{'id': i[0], 'event_name': i[1], 'starting_datetime': datetime.strptime(f'{i[2]}', '%Y-%m-%d %H:%M:%S'), 'ending_datetime': datetime.strptime(f'{i[3]}', '%Y-%m-%d %H:%M:%S'), 'host_user': i[4], 'gc_event_id':i[5], 'price': i[6], 'max_price': i[7], 'group_chat_link': i[8], 'website': i[9], 'address': i[10]
+        myresult = [{'id': i[0], 'event_name': i[1], 'starting_datetime': datetime.strptime(f'{i[2]}', '%Y-%m-%d %H:%M:%S'), 'ending_datetime': datetime.strptime(f'{i[3]}', '%Y-%m-%d %H:%M:%S'), 'host_user': i[4], 'gcal_event_id':i[5], 'price': i[6], 'max_price': i[7], 'group_chat_link': i[8], 'website': i[9], 'address': i[10]
                      } for i in myresult]
         if myresult[0]['ending_datetime'] > datetime.now() and myresult[0]['starting_datetime'] < datetime.now():
             return "em andamento"
@@ -561,7 +561,7 @@ def updateDateEvent(mydb, myresult, new_starting_datetime:datetime, user:str, is
         eventToGCalendar['end']['dateTime'] = new_ending_datetime.isoformat()
         service.events().update(
             calendarId=os.getenv('GOOGLE_CALENDAR_EVENTS_ID'),
-            eventId=myresult[0]['gc_event_id'],
+            eventId=myresult[0]['gcal_event_id'],
             body=eventToGCalendar).execute()
         #altera a data do evento
         query = f"""UPDATE events SET starting_datetime = '{new_starting_datetime}', ending_datetime = '{new_ending_datetime}' WHERE id = {myresult[0]['id']};"""

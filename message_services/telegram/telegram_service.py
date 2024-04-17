@@ -7,7 +7,7 @@ from datetime import datetime
 from database.database import *
 import os
 
-INITIAL, VIEW, UPDATE, EVENTDATECHANGE = range(4)
+MNG_EVENTS, EVENT_DATE_CHANGE, EVENT_INFO_CHANGE = range(3)
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
@@ -18,7 +18,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text('Olá, eu sou o Coddy! Se precisar de ajuda, digite /help')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text('olha, eu não vou poder te ajudar muito, mas se quiser, pode falar com o meu criador @Titioderg')
+    await update.message.reply_text(f'''Perfeitamente! Aqui está o que eu posso fazer por você:
+📋 - Sobre você
+Registre o seu **local**
+Registre o seu **aniversário**
+
+🎟 - Gerenciar Eventos
+Gerencie os eventos que você é staff
+''')
 
 async def registrar_local_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     local = " ".join(context.args)
@@ -52,12 +59,12 @@ async def gerenciarEventos(update:Update, context:ContextTypes.DEFAULT_TYPE):
     if len(events) == 0:
         await update.message.reply_text(f'Você não é staff de nenhum evento cadastrado!')
         return ConversationHandler.END
-    buttons = [[InlineKeyboardButton(text=e["event_name"], callback_data=e["id"])] for e in events]
-    keyboard_inline = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await update.message.reply_text('Escolha um dos eventos a seguir:', reply_markup=keyboard_inline)
-    
-    context.user_data["events"] = events
-    return VIEW
+    else:
+        context.user_data["events"] = events
+        buttons = [[InlineKeyboardButton(text=e["event_name"], callback_data=e["id"])] for e in events]
+        keyboard_inline = InlineKeyboardMarkup(inline_keyboard=buttons)
+        await update.message.reply_text('Escolha um dos eventos a seguir:', reply_markup=keyboard_inline)
+        return MNG_EVENTS
 
 async def returnToInitial(update:Update, context:ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -66,8 +73,7 @@ async def returnToInitial(update:Update, context:ContextTypes.DEFAULT_TYPE):
     buttons = [[InlineKeyboardButton(text=e["event_name"], callback_data=e["id"])] for e in events]
     keyboard_inline = InlineKeyboardMarkup(inline_keyboard=buttons)
     await query.edit_message_text(text=f'Escolha um dos eventos a seguir:', parse_mode='Markdown', reply_markup=keyboard_inline)
-    return VIEW
-
+    return MNG_EVENTS
 
 async def eventView(update:Update, context:ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -100,31 +106,28 @@ async def eventView(update:Update, context:ContextTypes.DEFAULT_TYPE):
         ##buttons[0].append(InlineKeyboardButton(text="Gerenciar Staff", callback_data="Gerenciar Staff"))
     keyboard_inline = InlineKeyboardMarkup(inline_keyboard=buttons)
     await query.edit_message_text(text=f'''{event_description}''', parse_mode='Markdown', reply_markup=keyboard_inline)
-    return UPDATE
+    return MNG_EVENTS
 
 async def eventAction(update:Update, context:ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer(query.id)
     changesType = query.data
     if changesType == 'Agendar': 
-        await context.bot.send_message(chat_id=query.from_user.id, text=f'Digite a data no formato _DD/MM/YYYY_:', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
-        return EVENTDATECHANGE
+        await context.bot.send_message(chat_id=query.from_user.id, text=f'Digite a data no formato **_DD/MM/YYYY_**:', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
     elif changesType == 'Reagendar':
-        await context.bot.send_message(chat_id=query.from_user.id, text=f'Digite a nova data no formato _DD/MM/YYYY_:', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
+        await context.bot.send_message(chat_id=query.from_user.id, text=f'Digite a nova data no formato **_DD/MM/YYYY_**:', parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
         context.user_data['reagendandoEvento'] = True
-        return EVENTDATECHANGE
-    elif changesType == 'Voltar':
-        context.user_data.pop("event")
-        await returnToInitial(update, context)
-        return VIEW
+    return EVENT_DATE_CHANGE
 
 
 async def handleEventDateChange(update:Update, context:ContextTypes.DEFAULT_TYPE):
-    try: data = datetime.strptime(update.message.text, "%d/%m/%Y")
+    try: data = datetime.strptime(query.from_user.text, "%d/%m/%Y")
     except ValueError:
-        await context.bot.send_message(chat_id=update.message.chat_id, text='Data inválida! Você informou uma data no formato "DD/MM/AAAA"?')
-        return EVENTDATECHANGE
+        await context.bot.send_message(chat_id=query.from_user.chat_id, text='Data inválida! Você informou uma data no formato "DD/MM/AAAA"?')
+        return EVENT_DATE_CHANGE
     # Atualizar a data do evento no banco de dados
+    query = update.callback_query
+    await query.answer(query.id)
     mydbAndCursor = startConnection()
     event = context.user_data["event"]
     if context.user_data.get('reagendandoEvento'):
@@ -135,10 +138,18 @@ async def handleEventDateChange(update:Update, context:ContextTypes.DEFAULT_TYPE
     context.user_data.pop("event")
     context.user_data.pop("events")
     if result == True:
-        await context.bot.send_message(chat_id=update.message.chat_id, text=f'O evento *{event["event_name"]}* foi agendado para {data.strftime("%d/%m/%Y")} com sucesso!', parse_mode='Markdown')
+        await context.bot.send_message(chat_id=query.from_user.chat_id, text=f'O evento *{event["event_name"]}* foi agendado para {data.strftime("%d/%m/%Y")} com sucesso!', parse_mode='Markdown')
     else:
-        await context.bot.send_message(chat_id=update.message.chat_id, text=f'Não foi possível agendar o evento *{event["event_name"]}*!', parse_mode='Markdown')
+        await context.bot.send_message(chat_id=query.from_user.chat_id, text=f'Não foi possível agendar o evento *{event["event_name"]}*!', parse_mode='Markdown')
     return ConversationHandler.END
+
+
+async def handleEventInfoChange(update:Update, context:ContextTypes.DEFAULT_TYPE):
+    pass
+
+
+
+
 
 async def cancel(update:Update, context:ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("event")
@@ -158,7 +169,7 @@ def run_telegram_client() -> None:
     app.add_handler(CommandHandler('help', help_command))
     app.add_handler(CommandHandler('registrar_local', registrar_local_command))
 
-    conv_handler = ConversationHandler(
+    """ conv_handler = ConversationHandler(
         entry_points=[CommandHandler("meus_eventos", gerenciarEventos)],
         states={
             INITIAL: [CallbackQueryHandler(returnToInitial)],
@@ -169,7 +180,31 @@ def run_telegram_client() -> None:
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
     )
-    app.add_handler(conv_handler)
+    app.add_handler(conv_handler) """
+
+    event_handler = ConversationHandler(
+        entry_points=[CommandHandler("meus_eventos", gerenciarEventos)],
+        states={
+            MNG_EVENTS: [
+                CallbackQueryHandler(eventView, pattern="^[0-9]+$"),
+                CallbackQueryHandler(returnToInitial, pattern="^Voltar$"),
+                CallbackQueryHandler(eventAction, pattern="^Agendar$"),
+                CallbackQueryHandler(eventAction, pattern="^Reagendar$"),
+                """ CallbackQueryHandler(eventView, pattern="^Editar$"),
+                CallbackQueryHandler(eventView, pattern="^Gerenciar Staff$"), """
+            ],
+            EVENT_DATE_CHANGE: [
+                MessageHandler(filters.TEXT, handleEventDateChange)
+            ],
+            EVENT_INFO_CHANGE: [
+                CallbackQueryHandler(eventView, pattern="^Editar$"),
+            ],
+        },
+        fallbacks=[CommandHandler("meus_eventos", gerenciarEventos)],
+        allow_reentry=True,
+    )
+    app.add_handler(event_handler)
+    
 
     #error handler
     
@@ -177,7 +212,9 @@ def run_telegram_client() -> None:
 
     try :
         print("Polling...")
-        app.run_polling(poll_interval=3, timeout=20, allowed_updates=Update.ALL_TYPES)
+        app.run_polling(poll_interval=100, timeout=100, allowed_updates=Update.ALL_TYPES, 
+                        close_loop=False, connect_timeout=100, read_timeout=100,
+                        write_timeout=100)
     except Exception as e:
         print(e)
         
@@ -187,7 +224,8 @@ def run_telegram_client() -> None:
 def runTelegramService():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(loop.create_task(run_telegram_client()))
+    loop.create_task(run_telegram_client())
+    loop.run_forever()
 
 if __name__ == '__main__':
     runTelegramService()

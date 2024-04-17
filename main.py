@@ -15,8 +15,8 @@ getCredentials()
 
 
 threads = []
-threads.append(threading.Thread(target=runTelegramService))
 threads.append(threading.Thread(target=startEventUpdater))
+threads.append(threading.Thread(target=runTelegramService))
 #threads.append(threading.Thread(target=main))
 
 for thread in threads:
