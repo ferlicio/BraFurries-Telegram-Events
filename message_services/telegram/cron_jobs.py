@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime, timezone
 from datetime import timedelta
-import time, os
+import time, os, re
 
 from telethon import TelegramClient
 from database.database import *
@@ -22,7 +22,7 @@ def calcular_diferenca_segundos(horario_atual, horario_execucao):
     # Converte string para datetime
     horario_execucao_obj = datetime.strptime(horario_execucao, "%H:%M").replace(tzinfo=timezone.utc).replace(year=horario_atual.year, month=horario_atual.month, day=horario_atual.day)
     # Ajustes
-    if horario_execucao_obj < horario_atual:
+    if horario_execucao_obj <horario_atual:
         horario_execucao_obj += timedelta(days=1)
     # Diferença em segundos
     diferenca_segundos = (horario_execucao_obj - horario_atual).total_seconds()
@@ -71,7 +71,7 @@ async def updateEvents(client):
             messageToSend = f"""🐾🐾🐾🐾 PRÓXIMOS EVENTOS 🐾🐾🐾🐾
 Lista do canal de <a href='https://t.me/eventosfurry'>eventos furry</a> no Telegram.
 
-⚠️NÃO É OBRIGATÓRIO FURSUIT PARA PARTICIPAR DE EVENTOS DO FURRY FANDOM
+⚠️NÃO É OBRIGATÓRIO FURSUIT PARA PARTICIPAR DE EVENTOS DA FURRY FANDOM
 
 """
             messageToSend += f"""
@@ -83,7 +83,7 @@ Lista do canal de <a href='https://t.me/eventosfurry'>eventos furry</a> no Teleg
 📍 <a href='https://www.google.com/maps/search/?api=1&query={event["address"].replace(',','%2C').replace(' ','%20')}'>{event["point_name"]}</a> ''' + '\n'+
 f"""
 """.join(filter(None, [
-f"📲 {event['group_chat_link']}" if event['group_chat_link']!=None else '',
+f"📲 {event['group_chat_link'].lower()}" if event['group_chat_link']!=None else '',
 f"💻 {event['website']}" if event['website']!=None else '',
 f'''💰 {"Ingressos esgotados" if event['out_of_tickets']
     else "Vendas encerradas" if event['sales_ended']
@@ -96,10 +96,16 @@ for event in sorted(events, key=lambda event: event["starting_datetime"]))
 Lista do canal Eventos Furry no Brasil do Telegram
 t.me/eventosfurry
 
-Canal mantido pela diretoria da Brasil FurFest
-t.me/brasilfurfest
+Canal mantido por:
+<a href='https://brafurries.com.br'>BraFurries - Furries do Brasil</a>
+Facebook: <a href='fb.com/groups/brafurries'>fb.com/groups/brafurries</a>
+Discord: <a href='https://discord.gg/brafurries'>discord.gg/brafurries</a>
+Telegram: <a href='t.me/brafurros'>t.me/brafurros</a>
 
-Para inserir eventos na lista, entre em contato com t.me/dannylauderdale ou t.me/patsypepper"""
+Para inserir eventos na lista, entre em contato com t.me/titioderg"""
+            messageToSend = re.sub(r'https*://t\.me\/(?<!\w)([a-zA-Z])(?!ventosfurry)',r'@\1', messageToSend)
+            messageToSend = re.sub(r'https*://t\.me\/',r't.me/', messageToSend)
+            messageToSend = re.sub(r'https*://(www)',r'\1', messageToSend)
             if canal['send_new_message'] == 0:
                 print("editando mensagem...")
                 await client.edit_message(events_channel, messageId, messageToSend, parse_mode='html', link_preview=False) #messageId pode ser trocado por um channel
